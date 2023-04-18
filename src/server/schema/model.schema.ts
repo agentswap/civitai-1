@@ -183,3 +183,9 @@ export const changeModelModifierSchema = z.object({
   id: z.number(),
   mode: z.nativeEnum(ModelModifier).nullable(),
 });
+
+export type DeclineReviewSchema = z.infer<typeof declineReviewSchema>;
+export const declineReviewSchema = z.object({
+  id: z.number(),
+  reason: z.string().optional(),
+});
