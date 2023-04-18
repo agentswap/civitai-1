@@ -1,8 +1,8 @@
-import { Grid, Input, SegmentedControl, Select, Stack } from '@mantine/core';
-import { useEffect, useState } from 'react';
+import { Grid, SegmentedControl, Stack } from '@mantine/core';
+import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 
-import { Form, InputText, useForm } from '~/libs/form';
+import { Form, InputSelect, InputText, useForm } from '~/libs/form';
 import {
   ModelAppUpsertInput,
   modelAppUpsertSchema,
@@ -16,22 +16,80 @@ enum UpsertRepoMode {
   Import = 'Import From GitHub',
 }
 
-const schema = modelAppUpsertSchema.refine((data) => (data?.url ? !!data?.url : true), {
-  message: 'Please select a repository or input a GitHub repository URL',
-  path: ['url'],
-});
-
 export function ModelAppUpsertForm({ model, children, onSubmit }: Props) {
   const [upsertRepoMode, setUpsertRepoMode] = useState<UpsertRepoMode>(UpsertRepoMode.Select);
+
+  const existedRepository = useMemo(
+    () => [
+      {
+        id: '1',
+        name: 'microsoft/JARVIS',
+        url: 'https://github.com/microsoft/JARVIS',
+      },
+      {
+        id: '2',
+        name: 'microsoft/JARVIS 2',
+        url: 'https://github.com/microsoft/JARVIS',
+      },
+      {
+        id: '3',
+        name: 'microsoft/JARVIS 3',
+        url: 'https://github.com/microsoft/JARVIS',
+      },
+    ],
+    []
+  );
+
+  const selectExistendRepositoryData = useMemo<{ value: string; label: string }[]>(
+    () => existedRepository.map((item) => ({ value: item.id, label: item.name })),
+    [existedRepository]
+  );
+
+  const selectDefaultRepository = useMemo(() => {
+    if (model?.app?.id) {
+      const selectDefault = existedRepository.find(
+        (item) => String(item.id) === String(model?.app?.id)
+      );
+      if (selectDefault) {
+        return selectDefault.id;
+      } else {
+        // TODO: Mock data, need to remove
+        return '1';
+      }
+    }
+    return undefined;
+  }, [model?.app?.id, existedRepository]);
+
+  const schema = useMemo(() => {
+    if (upsertRepoMode === UpsertRepoMode.Select) {
+      return modelAppUpsertSchema.pick({}).merge(z.object({ existedRepository: z.string() }));
+    } else if (upsertRepoMode == UpsertRepoMode.Import) {
+      return modelAppUpsertSchema.refine((data) => (data?.url ? !!data?.url : true), {
+        message: 'Please select a repository or input a GitHub repository URL',
+        path: ['url'],
+      });
+    } else {
+      return modelAppUpsertSchema.merge(z.object({ existedRepository: z.string().optional() }));
+    }
+  }, [upsertRepoMode]);
+
   const defaultValues: ModelAppUpsertInput = {
     id: model?.app?.id,
     name: model?.app?.name ?? '',
     url: model?.app?.url ?? '',
   };
-  const form = useForm({ schema, mode: 'onChange', defaultValues, shouldUnregister: false });
+  const form = useForm({
+    schema,
+    mode: 'onChange',
+    defaultValues: {
+      ...defaultValues,
+      existedRepository: selectDefaultRepository,
+    },
+    shouldUnregister: false,
+  });
   const queryUtils = trpc.useContext();
 
-  const { isDirty, errors } = form.formState;
+  const { isDirty } = form.formState;
 
   const upsertModelMutation = trpc.model.upsert.useMutation({
     onSuccess: async (data, payload) => {
@@ -44,8 +102,31 @@ export function ModelAppUpsertForm({ model, children, onSubmit }: Props) {
     },
   });
   const handleSubmit = (data: z.infer<typeof schema>) => {
-    if (isDirty) upsertModelMutation.mutate({ ...model, app: data } as ModelUpsertInput);
-    else onSubmit(defaultValues);
+    if (isDirty) {
+      let _data = null;
+
+      if (upsertRepoMode === UpsertRepoMode.Select) {
+        const selectedRepository = existedRepository.find(
+          (item) =>
+            String(item.id) === String((data as { existedRepository: string })?.existedRepository)
+        );
+        if (selectedRepository) {
+          _data = {
+            name: selectedRepository.name,
+            url: selectedRepository.url,
+          };
+        }
+      } else if (upsertRepoMode === UpsertRepoMode.Import) {
+        _data = {
+          name: (data as { name: string })?.name,
+          url: (data as { url: string })?.url,
+        };
+      }
+
+      if (_data) {
+        upsertModelMutation.mutate({ ...model, app: _data } as ModelUpsertInput);
+      }
+    }
   };
 
   useEffect(() => {
@@ -80,14 +161,14 @@ export function ModelAppUpsertForm({ model, children, onSubmit }: Props) {
               }}
             />
             {upsertRepoMode === UpsertRepoMode.Select ? (
-              <Select
+              <InputSelect
+                name="existedRepository"
                 label="Choose an existed repository"
-                // defaultValue={<select by model?.app?.id>}
-                data={[]}
+                placeholder="Pick one"
+                data={selectExistendRepositoryData}
                 withAsterisk
-                onChange={() => alert('Not implemented')}
               />
-            ) : (
+            ) : upsertRepoMode === UpsertRepoMode.Import ? (
               <Stack spacing={5}>
                 <InputText
                   name="name"
@@ -103,9 +184,8 @@ export function ModelAppUpsertForm({ model, children, onSubmit }: Props) {
                   placeholder="Github URL"
                   withAsterisk
                 />
-                {errors.url && <Input.Error>{errors.url.message}</Input.Error>}
               </Stack>
-            )}
+            ) : null}
           </Stack>
         </Grid.Col>
       </Grid>
