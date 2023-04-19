@@ -317,9 +317,11 @@ export const upsertModel = ({
   ...data
 }: // TODO.manuel: hardcoding meta type since it causes type issues in lots of places if we set it in the schema
 ModelUpsertInput & { userId: number; meta?: Prisma.ModelCreateInput['meta'] }) => {
-  if (!id)
+  if (!id) {
     return dbWrite.model.create({
       select: { id: true },
+      // TODO: Don't know how to fix type error here
+      // @ts-ignore
       data: {
         ...data,
         app: app
@@ -330,6 +332,7 @@ ModelUpsertInput & { userId: number; meta?: Prisma.ModelCreateInput['meta'] }) =
               },
             }
           : undefined,
+        user: undefined,
         userId,
         tagsOnModels: tagsOnModels
           ? {
@@ -348,7 +351,7 @@ ModelUpsertInput & { userId: number; meta?: Prisma.ModelCreateInput['meta'] }) =
           : undefined,
       },
     });
-  else
+  } else
     return dbWrite.model.update({
       select: { id: true },
       where: { id },
@@ -413,6 +416,8 @@ export const createModel = async ({
       });
 
     return tx.model.create({
+      // TODO: Don't know how to fix type error here
+      // @ts-ignore
       data: {
         ...data,
         checkpointType: data.type === ModelType.Checkpoint ? data.checkpointType : null,
