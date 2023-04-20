@@ -23,7 +23,7 @@
 - [Sponsors](#sponsors)
 - [License](#license)
 
-## About the Project Test
+## About the Project Test Test
 
 Our goal with this project is to create a platform where people can share their stable diffusion models (textual inversions, hypernetworks, aesthetic gradients, VAEs, and any other crazy stuff people do to customize their AI generations), collaborate with others to improve them, and learn from each other's work. The platform allows users to create an account, upload their models, and browse models that have been shared by others. Users can also leave comments and feedback on each other's models to facilitate collaboration and knowledge sharing.
 
